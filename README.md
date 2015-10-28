@@ -10,7 +10,7 @@ Getting Setup
 
 Running the script
 ==================
-### Retrieve crash counts for all applications
+### Retrieve stats for all applications
 #### Syntax
 ```
 node index.js [client ID] [username] [password]
@@ -21,7 +21,7 @@ node index.js [client ID] [username] [password]
 node index.js WV3v7ZTaYmqtUOMNvO7oPhLi8RN9zFoo joe@tester.com abc123
 ```
 
-### Retrieve crash counts for a specific application
+### Retrieve stats for a specific application
 #### Syntax
 ```
 node index.js [client ID] [username] [password] [app name]
@@ -30,4 +30,15 @@ node index.js [client ID] [username] [password] [app name]
 #### Example
 ```
 node index.js WV3v7ZTaYmqtUOMNvO7oPhLi8RN9zFoo joe@tester.com abc123 WhizBang
+```
+
+### Retrieve stats for a specific version of an application
+#### Syntax
+```
+node index.js [client ID] [username] [password] [app name] [app version]
+```
+
+#### Example
+```
+node index.js WV3v7ZTaYmqtUOMNvO7oPhLi8RN9zFoo joe@tester.com abc123 WhizBang "2.1 (2.1.12)"
 ```

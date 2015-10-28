@@ -9,21 +9,28 @@ var baseUrl = 'https://developers.crittercism.com/v1.0'
 if (process.argv.length < 5) {
 	console.log('node index.js [client ID] [username] [password]');
 	console.log('node index.js [client ID] [username] [password] [app  name]');
+	console.log('node index.js [client ID] [username] [password] [app  name] [app version]');
 	process.exit();
 }
 
+// Read command line arguments.
 var args = {
 	clientId: process.argv[2],
 	username: process.argv[3],
 	password: process.argv[4],
-	appName: process.argv[5]
+	appName: process.argv[5],
+	appVersion: process.argv[6]
 };
 
-var data = {
-	grant_type: 'password',
-	username: args.username,
-	password: args.password
-}
+
+main(); // run the script
+
+function main() {
+	var data = {
+		grant_type: 'password',
+		username: args.username,
+		password: args.password
+	}
 
 	var params = {url: baseUrl + '/token', formData: data};
 	params.auth = {
@@ -34,31 +41,28 @@ var data = {
 
 	request.post(params, function (error, response, body) {
 	  if (!error && response.statusCode == 200) {
-		var parsed = JSON.parse(body);
-		onLoginSuccess(parsed.access_token);
+	  	console.log('Token successfully generated.');
+		var accessToken = JSON.parse(body).access_token;
+		get('/apps?attributes=appName,appType,appVersions', accessToken, function(e, r, body) {
+			var apps = JSON.parse(body);
+			var series = [];
+			for (var id in apps) {
+				if (!args.appName || apps[id].appName == args.appName)  {
+					console.log('Found app id ' + id);
+					//series.push(showCrashCounts(id, apps[id], accessToken));
+					var appName =  '"' + apps[id].appName + '" (' + apps[id].appType + ')';
+					series.push(createBuildTableAction(id, appName, accessToken));
+				}
+			}
+			console.log(series.length + ' apps total.');
+			async.series(series);
+		});
 	  } else {
-	  	console.log(body);
+	  	console.log('Failed to generate token: ' + error);
 	  }
 	});
+}
 
-
-function onLoginSuccess(access_token) {
-	console.log('Token successfully generated.');
-	doGet('/apps?attributes=appName,appType', access_token, function(e, r, body) {
-		var apps = JSON.parse(body);
-		var series = [];
-		for (var id in apps) {
-			if (!args.appName || apps[id].appName == args.appName)  {
-				console.log('Found app id ' + id);
-				//series.push(showCrashCounts(id, apps[id], access_token));
-				var appName =  '"' + apps[id].appName + '" (' + apps[id].appType + ')';
-				series.push(createBuildTableAction(id, appName, access_token));
-			}
-		}
-		console.log(series.length + ' apps total.');
-		async.series(series);
-	});
-}	
 
 function createBuildTableAction(appId, appName, accessToken)
 {
@@ -68,33 +72,27 @@ function createBuildTableAction(appId, appName, accessToken)
 	}
 }
 
-function createAddToTableAction(subject) {
+function createAddToTableAction(appId, subject, rows, accessToken) {
 	return function(callback) { getGraph(appId, subject, accessToken, function(graph, values) {
 			addToTable(rows, subject, graph, values);
 			callback();
 		}
-	)}
+	)};
 }
 
 function buildTable(appId, appName, accessToken) {
 	var rows = [];
 	var series = [];
 
-	series.push(function(callback) { getGraph(appId, "dau", accessToken, function(graph, values) {
-			addToTable(rows, "dau", graph, values);
-			callback();
-		}
-	)});
-	series.push(function(callback) { getGraph(appId, "appLoads", accessToken, function(graph, values) {
-			addToTable(rows, "appLoads", graph, values);
-			callback();
-		}
-	)});
-	series.push(function(callback) { getGraph(appId, "crashes", accessToken, function(graph, values) {
-			addToTable(rows, "crashes", graph, values);
-			callback();
-		}
-	)});
+	series.push(createAddToTableAction(appId, "dau", rows, accessToken));
+	series.push(createAddToTableAction(appId, "appLoads", rows, accessToken));
+	series.push(createAddToTableAction(appId, "crashes", rows, accessToken));
+	series.push(createAddToTableAction(appId, "crashPercent", rows, accessToken));
+	series.push(createAddToTableAction(appId, "affectedUsers", rows, accessToken));
+	series.push(createAddToTableAction(appId, "affectedUserPercent", rows, accessToken));
+	series.push(createAddToTableAction(appId, "rating", rows, accessToken));
+	series.push(createAddToTableAction(appId, "mau", rows, accessToken));
+
 	series.push(function(callback) {
 		console.log('************ APP ' + appId + ' ' + appName + ' ******************')
 		for (var i in rows) {
@@ -111,11 +109,7 @@ function buildTable(appId, appName, accessToken) {
 	});
 
 	async.series(series);
-
 }
-
-
-
 
 function addToTable(rows, fieldName, graph, values) {
 	var startDate = new Date(graph.data.start);
@@ -158,21 +152,31 @@ function getGraph(appId, subject, accessToken, callback) {
 			"duration": 86400
 		}
 	};
+	// note that 'mau' does not support filters
+	if (args.appVersion && subject != "mau") {
+		body.params.filters = { appVersion: args.appVersion };
+	}
+
 	post('/errorMonitoring/graph', body, accessToken, function(body) {
 		var values = [];
-		for (var i in body.data.series[0].points) {
-			values.push(body.data.series[0].points[i]);
+		if (!body) {
+			console.log('No data available.');
+		} else {
+			for (var i in body.data.series[0].points) {
+				values.push(body.data.series[0].points[i]);
+			}
 		}
 		callback(body, values);
 	});
 }
 
-function showCrashCounts(id, app, access_token) {
+/*
+function showCrashCounts(id, app, accessToken) {
 	return function(callback) {
 		var appTitle =  '"' + app.appName + '" (' + app.appType + ')';
 		var path = '/app/' + id + '/crash/counts';
 		console.log('Showing crash counts for ' + appTitle + ', taken from ' + path + ':');
-		doGet(path, access_token, function(e, r, body) {
+		get(path, accessToken, function(e, r, body) {
 			var stats = JSON.parse(body);
 			for (var i in stats) {
 				console.log('--' + stats[i].date + ': ' + stats[i].value);
@@ -181,25 +185,20 @@ function showCrashCounts(id, app, access_token) {
 		});
 	};
 }
+*/
 
-var post = function(path, body, accessToken, callback)  {
+function post(path, body, accessToken, callback)  {
 	var params = {url: baseUrl + path, json: body};
 	request.post(params, function (error, response, body) {
 	  if (!error && response.statusCode == 200) {
 	    callback(body);
 	  } else {
-	  	console.log('failed post: ' + body);
+	  	console.log('failed post: ' + JSON.stringify(body));
 	  	callback(error);
 	  }
 	}).auth(null, null, true, accessToken);
 }
 
-function doGet(path, access_token, callback) {
-	request.get(baseUrl + path, callback).auth(null, null, true, access_token);	
-}
-
-function doGetToConsole(path, access_token, caption, callback) {
-	request.get(baseUrl + path, function (e, r, body) {
-		console.log(caption + ": " + body);
-	}).auth(null, null, true, access_token);	
+function get(path, accessToken, callback) {
+	request.get(baseUrl + path, callback).auth(null, null, true, accessToken);	
 }
