@@ -1,6 +1,16 @@
 About
 ============
-Just provides some very crude but functional client code in Node.js to help get started consuming the Crittercism REST API.
+Just provides some very crude but functional client code in Node.js to help get started consuming the Crittercism REST API. Extracts stats by date in CSV format, including daily active users, app loads, crashes, and more.
+
+Example Output (CSV Format)
+===========================
+Date,dau,appLoads,crashes,crashPercent,affectedUsers,affectedUserPercent,rating,mau
+10/1/15,24,272,2,5.88,7,112,0,2733606
+10/2/15,40,33,0,0,0,0,0,1533190
+10/3/15,3,54,0,0,0,0,0,2154166
+10/4/15,15632,7210,528,17.08,270,11,0,2769219
+10/5/15,412848,436448,5402,12.4,9500,5,0,2730924
+10/6/15,234840,211355,878,16.64,1636,20,0,1510185
 
 Getting Setup
 ============
