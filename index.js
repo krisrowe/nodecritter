@@ -45,6 +45,7 @@ function main() {
 		var accessToken = JSON.parse(body).access_token;
 		get('/apps?attributes=appName,appType,appVersions', accessToken, function(e, r, body) {
 			var apps = JSON.parse(body);
+			//console.log(body);
 			var series = [];
 			for (var id in apps) {
 				if (!args.appName || apps[id].appName == args.appName)  {
@@ -116,8 +117,12 @@ function addToTable(rows, fieldName, graph, values) {
 	// When the JSON date/time is parsed above, it is recognized as UTC, so it computes an offset for 
 	// local time and the date changes. We are correcting that with the below so that the Date object
 	// will have the original values for date, hour, etc.
-	var startDate = new Date(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate(), 
+	startDate = new Date(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate(), 
 		startDate.getUTCHours(), startDate.getUTCMinutes(), startDate.getUTCSeconds());
+	// The start date as reported by the API is not actually included in the results, though the end
+	// date (which is today) is included. We thus need to increment the reported start date by one day
+	// in terms of how we interpret the rows of data and what date the apply to.
+	startDate.setDate(startDate.getDate() + 1);
 	if (rows.length > 0) {
 		if (values.length != (rows.length - 1)) {
 			throw "Values range mismatch.";
